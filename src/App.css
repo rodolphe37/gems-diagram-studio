@@ -1,0 +1,9 @@
+.canvas-container {
+  width: 100vw !important;
+  height: 100%;
+  display: block;
+}
+.controls-panel {
+  flex-direction: row;
+  align-items: baseline;
+}
