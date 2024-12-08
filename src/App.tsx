@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Text } from "@react-three/drei";
 import * as THREE from "three";
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from "three/examples/jsm/Addons.js";
 
 type TDiamondProps = {
   tableDiameter: number;
@@ -18,8 +20,9 @@ type TDiamondProps = {
   };
   pavilionDiameter: number;
 };
+
 const Diamond = ({
-  tableDiameter, // Diamètre supérieur de la table
+  tableDiameter,
   tableHeight,
   crownHeight,
   pavilionHeight,
@@ -27,46 +30,97 @@ const Diamond = ({
   crownFacets,
   pavilionFacets,
   visibility,
-  pavilionDiameter, // Diamètre du pavillon, utilisé pour le diamètre inférieur de la table
+  pavilionDiameter,
 }: TDiamondProps) => {
-  const tableHeightMM = tableHeight * 100; // Convertir en mm
-  const crownHeightMM = crownHeight * 100; // Convertir en mm
-  const pavilionHeightMM = pavilionHeight * 100; // Convertir en mm
-  const tableDiameterMM = tableDiameter * 100; // Diamètre supérieur de la table en mm
-  const pavilionDiameterMM = pavilionDiameter * 100; // Diamètre du pavillon en mm
+  const tableHeightMM = tableHeight * 100;
+  const crownHeightMM = crownHeight * 100;
+  const pavilionHeightMM = pavilionHeight * 100;
+  const tableDiameterMM = tableDiameter * 100;
+  const pavilionDiameterMM = pavilionDiameter * 100;
 
-  const pavilionPositionY = -crownHeightMM; // Le pavillon reste toujours collé au bas de la couronne
+  const pavilionPositionY = -crownHeightMM;
   const crownPositionY = pavilionPositionY + pavilionHeightMM / 2;
   const tablePositionY = crownPositionY + crownHeightMM;
 
-  // Matériau pour les lignes (trait noir épais)
   const blackWireframeMaterial = new THREE.LineBasicMaterial({
     color: "black",
-    linewidth: 4, // Augmenter l'épaisseur des arêtes pour plus de visibilité
+    linewidth: 4,
   });
 
-  // Matériau pastel clair pour les facettes
-  const pastelMaterial = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(0xfff), // Couleur pastel très clair (bleu clair très pâle)
-    metalness: 0.5, // Donne un effet de brillance
-    roughness: 0.5, // Ajuste la rugosité de la surface pour une lumière diffuse
-    emissive: new THREE.Color(0.1, 0.1, 0.1), // Émission de lumière faible pour donner un effet doux
-    side: THREE.FrontSide, // Applique le matériau sur la face avant
-  });
+  // const pastelMaterial = new THREE.MeshStandardMaterial({
+  //   color: new THREE.Color(0xfff),
+  //   metalness: 0.5,
+  //   roughness: 0.5,
+  //   emissive: new THREE.Color(0.1, 0.1, 0.1),
+  //   side: THREE.FrontSide,
+  // });
 
-  // Fonction pour créer un wireframe (trait de séparation uniquement)
   const getWireframe = (geometry: THREE.CylinderGeometry) => {
     const wireframe = new THREE.WireframeGeometry(geometry);
     return new THREE.LineSegments(wireframe, blackWireframeMaterial);
   };
 
+  // Fonction pour dessiner la règle graduée autour de la couronne
+  const createGraduations = (diameter: number) => {
+    const radius = diameter / 2;
+    const graduationGroup = new THREE.Group();
+    const loader = new FontLoader();
+
+    const angleStep = (2 * Math.PI) / 96;
+
+    // Créer les graduations avec les numéros
+    for (let i = 0; i < 96; i++) {
+      if (i % 2 === 0) {
+        const angle = -angleStep * i;  // Inverser l'angle pour le sens horaire
+        const x = radius * Math.cos(angle);
+        const z = radius * Math.sin(angle);
+
+        // Créer une graduation (ligne fine)
+        const graduation = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.5, 0.5, 5, 12), // Petite ligne
+          blackWireframeMaterial
+        );
+        graduation.position.set(x, crownHeightMM / 2, z);
+        graduation.rotation.set(Math.PI / 2, 0, angle);
+        graduationGroup.add(graduation);
+
+        // Ajouter les numéros sur les graduations
+        loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (font) => {
+          const textGeometry = new TextGeometry(`${i}`, { 
+            font: font,
+            size: 5,
+            depth: 1,
+          });
+
+          const textMaterial = new THREE.MeshBasicMaterial({ color: "black" });
+          const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+
+          let textRotation = Math.PI / 2;
+
+          if (angle > Math.PI) {
+            textRotation = -Math.PI / 2;
+          }
+
+          textMesh.position.set(x + 8, crownHeightMM / 2 + 8, z);
+          textMesh.rotation.set(0, textRotation, 0);
+          graduationGroup.add(textMesh);
+        });
+      }
+    }
+
+    return graduationGroup;
+  };
+
+  // Calcul du diamètre de la règle
+  const ruleDiameterMM = pavilionDiameterMM * 1.2; // Règle plus large que la couronne
+
   return (
     <group>
-      {/* Table (partie supérieure) */}
+      {/* Table */}
       {visibility.table && (
         <mesh
           position={[0, tablePositionY + tableHeightMM / 2, 0]}
-          material={pastelMaterial}
+          // material={pastelMaterial}
         >
           <cylinderGeometry
             args={[
@@ -93,7 +147,7 @@ const Diamond = ({
       {visibility.crown && (
         <mesh
           position={[0, crownPositionY + crownHeightMM / 2, 0]}
-          material={pastelMaterial}
+          // material={pastelMaterial}
         >
           <cylinderGeometry
             args={[
@@ -121,7 +175,7 @@ const Diamond = ({
         <mesh
           position={[0, pavilionPositionY, 0]}
           rotation={[Math.PI, 0, 0]}
-          material={pastelMaterial}
+          // material={pastelMaterial}
         >
           <coneGeometry
             args={[pavilionDiameterMM / 2, pavilionHeightMM, pavilionFacets]}
@@ -137,81 +191,73 @@ const Diamond = ({
           />
         </mesh>
       )}
+
+      {/* Règle graduée : maintenant elle est placée au niveau de la couronne */}
+      <primitive
+        object={createGraduations(ruleDiameterMM)}
+        position={[0, crownHeightMM, 0]}  // Positionnée à la hauteur de la couronne
+      />
     </group>
   );
 };
 
 const App = () => {
-  const [view, setView] = useState<string>("global"); // Vue par défaut: 'global'
+  const [view, setView] = useState<string>("global");
   const [tableHeight, setTableHeight] = useState<number>(0.13);
   const [crownHeight, setCrownHeight] = useState<number>(0.05);
   const [pavilionHeight, setPavilionHeight] = useState<number>(0.75);
-  const [tableDiameter, setTableDiameter] = useState<number>(2); // Diamètre supérieur de la table
-  const [pavilionDiameter, setPavilionDiameter] = useState<number>(2); // Diamètre du pavillon
+  const [tableDiameter, setTableDiameter] = useState<number>(2);
+  const [pavilionDiameter, setPavilionDiameter] = useState<number>(2);
 
-  // Nombre de facettes pour chaque partie
   const [tableFacets, setTableFacets] = useState<number>(16);
   const [crownFacets, setCrownFacets] = useState<number>(16);
   const [pavilionFacets, setPavilionFacets] = useState<number>(16);
 
   const controlsRef = useRef(null!);
 
-  // Calculer les angles d'inclinaison pour chaque partie
   const calculateAngle = (diameter: number, height: number) => {
-    const diameterMM = diameter * 100; // Convertir en mm
-    const heightMM = height * 100; // Convertir en mm
-    return Math.atan(diameterMM / (2 * heightMM)) * (180 / Math.PI); // Calcul en degrés
+    const diameterMM = diameter * 100;
+    const heightMM = height * 100;
+    return Math.atan(diameterMM / (2 * heightMM)) * (180 / Math.PI);
   };
 
   const tableAngle = calculateAngle(tableDiameter, tableHeight);
   const crownAngle = calculateAngle(pavilionDiameter, crownHeight);
   const pavilionAngle = calculateAngle(pavilionDiameter, pavilionHeight);
 
-  // Mise à jour de la caméra à chaque changement de vue
   useEffect(() => {
     const { current: controls } = controlsRef;
     if (controls) {
       switch (view) {
         case "top":
-          // @ts-expect-error: Should expect string
-          controls.setAzimuthalAngle(Math.PI / 2); // Vue du haut
-          // @ts-expect-error: Should expect string
+          controls.setAzimuthalAngle(Math.PI / 2);
           controls.setPolarAngle(Math.PI / 2);
           break;
         case "profile":
-          // @ts-expect-error: Should expect string
-          controls.setAzimuthalAngle(0); // Vue de profil
-          // @ts-expect-error: Should expect string
+          controls.setAzimuthalAngle(0);
           controls.setPolarAngle(Math.PI / 3);
           break;
         case "bottom":
-          // @ts-expect-error: Should expect string
-          controls.setAzimuthalAngle(Math.PI); // Vue du bas
-          // @ts-expect-error: Should expect string
+          controls.setAzimuthalAngle(Math.PI);
           controls.setPolarAngle(Math.PI / 2);
           break;
         case "global":
-          // @ts-expect-error: Should expect string
-          controls.setAzimuthalAngle(Math.PI / 4); // Vue globale
-          // @ts-expect-error: Should expect string
+          controls.setAzimuthalAngle(Math.PI / 4);
           controls.setPolarAngle(Math.PI / 3);
           break;
         default:
-          // @ts-expect-error: Should expect string
           controls.setAzimuthalAngle(Math.PI / 2);
-          // @ts-expect-error: Should expect string
           controls.setPolarAngle(Math.PI / 2);
       }
     }
   }, [view]);
 
-  // Déterminer la visibilité des différentes parties en fonction de la vue sélectionnée
   const visibility = {
-    table: view === "top" || view === "global", // Table visible en vue globale et vue du haut
+    table: view === "top" || view === "global",
     crown:
       view !== "top" &&
-      (view === "top" || view === "profile" || view === "global"), // Couronne visible sauf en vue du haut
-    pavilion: view === "profile" || view === "global" || view === "bottom", // Pavillon visible en vue de profil, global et bas
+      (view === "top" || view === "profile" || view === "global"),
+    pavilion: view === "profile" || view === "global" || view === "bottom",
   };
 
   return (
@@ -224,7 +270,6 @@ const App = () => {
         alignItems: "center",
       }}
     >
-      {/* Espace réservé en haut pour afficher l'inclinaison et le nombre de facettes */}
       <div
         style={{
           position: "absolute",
@@ -246,7 +291,6 @@ const App = () => {
           <strong>Inclinaison Pavillon : </strong>
           {pavilionAngle.toFixed(2)}°
         </div>
-
         <div>
           <strong>Nombre de facettes Table : </strong>
           {tableFacets}
@@ -262,10 +306,10 @@ const App = () => {
       </div>
 
       <Canvas
-        style={{ width: "100%", height: "100%" }} // Canvas à 80% de la largeur et de la hauteur de l'écran
+        style={{ width: "100%", height: "100%" }}
         camera={{
-          fov: 60, // Augmenter le FOV pour dé-zoomer
-          position: [0, 0, 240], // Déplacer la caméra plus loin pour un effet de dé-zoom
+          fov: 60,
+          position: [0, 0, 240],
         }}
       >
         <ambientLight intensity={0.5} />
@@ -280,7 +324,7 @@ const App = () => {
           crownFacets={crownFacets}
           pavilionFacets={pavilionFacets}
           visibility={visibility}
-          pavilionDiameter={pavilionDiameter} // Le diamètre du pavillon est utilisé pour le diamètre inférieur de la table
+          pavilionDiameter={pavilionDiameter}
         />
       </Canvas>
 
